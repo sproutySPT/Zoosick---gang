@@ -1,0 +1,1481 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>주식 시뮬레이터 🎰</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=Noto+Sans+KR:wght@300;400;700;900&display=swap');
+
+:root {
+  --bg: #0c0c0f;
+  --surface: #131318;
+  --surface2: #1a1a22;
+  --border: #222230;
+  --up: #00e676;
+  --down: #ff3d57;
+  --flat: #8888aa;
+  --text: #e0e0ee;
+  --muted: #555570;
+  --gold: #f5c842;
+  --mono: 'IBM Plex Mono', monospace;
+  --sans: 'Noto Sans KR', sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; font-size: 13px; }
+
+.app { max-width: 540px; margin: 0 auto; padding: 0 0 70px; }
+
+/* ── 헤더 ── */
+.header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px 10px;
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; background: var(--bg); z-index: 50;
+}
+.header-left { display: flex; align-items: center; gap: 10px; }
+.header-title { font-family: var(--mono); font-size: 14px; font-weight: 700; letter-spacing: 0.04em; }
+.header-right { display: flex; align-items: center; gap: 10px; }
+.header-cash { text-align: right; }
+.cash-label { font-size: 10px; color: var(--muted); font-family: var(--mono); }
+.cash-value { font-family: var(--mono); font-size: 16px; font-weight: 700; color: var(--gold); }
+
+/* 가이드 버튼 */
+.guide-btn {
+  background: linear-gradient(135deg, #2a2a40, #1a1a28);
+  border: 1px solid #4444aa;
+  border-radius: 20px;
+  color: #aaaaff;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.05em;
+}
+.guide-btn:hover { background: #2a2a50; border-color: #6666cc; color: #ccccff; }
+
+/* ── 포트폴리오 바 ── */
+.portfolio-bar {
+  display: flex; gap: 16px; padding: 8px 16px;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.pf-item { display: flex; flex-direction: column; }
+.pf-label { font-size: 9px; color: var(--muted); font-family: var(--mono); text-transform: uppercase; letter-spacing: 1px; }
+.pf-value { font-family: var(--mono); font-size: 13px; font-weight: 600; }
+.pf-value.up   { color: var(--up); }
+.pf-value.down { color: var(--down); }
+.pf-value.flat { color: var(--flat); }
+
+/* 전체 수익률 큰 배너 */
+.big-pnl-banner {
+  margin: 0;
+  padding: 10px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.big-pnl-label { font-size: 10px; color: var(--muted); font-family: var(--mono); }
+.big-pnl-value { font-family: var(--mono); font-size: 22px; font-weight: 900; letter-spacing: -0.5px; transition: all 0.3s; }
+.big-pnl-value.up   { color: var(--up); text-shadow: 0 0 20px rgba(0,230,118,0.5); }
+.big-pnl-value.down { color: var(--down); text-shadow: 0 0 20px rgba(255,61,87,0.5); }
+.big-pnl-value.flat { color: var(--flat); }
+.pnl-emoji { font-size: 24px; }
+
+/* ── 탭 ── */
+.tabs {
+  display: flex; border-bottom: 1px solid var(--border);
+  background: var(--bg); position: sticky; top: 51px; z-index: 49;
+}
+.tab {
+  flex: 1; padding: 10px 0; text-align: center;
+  font-family: var(--mono); font-size: 12px; cursor: pointer;
+  color: var(--muted); border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s; user-select: none;
+}
+.tab.active { color: var(--text); border-color: var(--text); }
+
+/* ── 뉴스 배너 ── */
+.news-banner {
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 7px 16px; font-size: 11px; color: var(--muted);
+  font-family: var(--mono); overflow: hidden; white-space: nowrap;
+}
+.news-ticker { display: inline-block; animation: ticker 24s linear infinite; }
+@keyframes ticker {
+  0%   { transform: translateX(120vw); }
+  100% { transform: translateX(-100%); }
+}
+.news-tag-good { color: var(--up); }
+.news-tag-bad  { color: var(--down); }
+
+/* ── 카운트다운 ── */
+.tick-bar {
+  height: 3px; background: var(--surface2);
+  position: relative; overflow: hidden;
+}
+.tick-progress {
+  position: absolute; left: 0; top: 0; height: 100%;
+  background: linear-gradient(90deg, #444488, #8888ff);
+  transition: width 0.1s linear;
+}
+
+/* ── 종목 목록 ── */
+.stock-list { padding: 8px 0; }
+.stock-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px; border-bottom: 1px solid var(--border);
+  cursor: pointer; transition: background 0.1s; user-select: none;
+  position: relative;
+}
+.stock-row:active { background: var(--surface); }
+
+/* 등락 플래시 */
+.stock-row.flash-up   { animation: flashUp 0.4s; }
+.stock-row.flash-down { animation: flashDown 0.4s; }
+@keyframes flashUp   { 0%,100%{background:transparent} 50%{background:rgba(0,230,118,0.12)} }
+@keyframes flashDown { 0%,100%{background:transparent} 50%{background:rgba(255,61,87,0.12)} }
+
+.stock-icon {
+  width: 36px; height: 36px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0;
+}
+.stock-info { flex: 1; min-width: 0; }
+.stock-name { font-weight: 700; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stock-code { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+.stock-price-col { text-align: right; flex-shrink: 0; }
+.stock-price { font-family: var(--mono); font-size: 15px; font-weight: 700; }
+.stock-change { font-family: var(--mono); font-size: 11px; display: flex; align-items: center; justify-content: flex-end; gap: 3px; }
+.mini-chart { width: 64px; height: 32px; flex-shrink: 0; }
+
+/* 등락 배지 (크게 보이도록) */
+.change-badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 7px; border-radius: 6px; font-family: var(--mono); font-size: 12px; font-weight: 700;
+}
+.change-badge.up   { background: rgba(0,230,118,0.15); color: var(--up); border: 1px solid rgba(0,230,118,0.3); }
+.change-badge.down { background: rgba(255,61,87,0.15);  color: var(--down); border: 1px solid rgba(255,61,87,0.3); }
+
+/* ── 종목 상세 ── */
+.detail-view { padding: 0; }
+.detail-header { padding: 14px 16px 10px; border-bottom: 1px solid var(--border); }
+.detail-name { font-size: 17px; font-weight: 700; }
+.detail-code { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 1px; }
+.detail-price { font-family: var(--mono); font-size: 32px; font-weight: 700; margin: 6px 0 2px; line-height: 1; }
+.detail-change { font-family: var(--mono); font-size: 13px; }
+
+/* 큰 등락 표시기 */
+.direction-bar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 16px; border-bottom: 1px solid var(--border);
+}
+.direction-indicator {
+  flex: 1; padding: 8px 12px; border-radius: 10px;
+  text-align: center; font-family: var(--mono); font-size: 18px; font-weight: 900;
+  letter-spacing: 0.05em;
+}
+.direction-indicator.up   { background: rgba(0,230,118,0.12); color: var(--up); border: 1.5px solid rgba(0,230,118,0.3); }
+.direction-indicator.down { background: rgba(255,61,87,0.12);  color: var(--down); border: 1.5px solid rgba(255,61,87,0.3); }
+.direction-indicator.flat { background: rgba(136,136,170,0.1); color: var(--flat); border: 1.5px solid rgba(136,136,170,0.2); }
+
+/* ── 캔들차트 ── */
+.chart-wrap { padding: 12px 16px 0; position: relative; }
+.chart-title { font-family: var(--mono); font-size: 10px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px; }
+canvas#mainChart { width: 100%; display: block; }
+
+/* ── 거래창 ── */
+.trade-panel { padding: 14px 16px; border-top: 1px solid var(--border); }
+.trade-row { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+.trade-label { font-size: 11px; color: var(--muted); font-family: var(--mono); width: 52px; flex-shrink: 0; }
+.qty-ctrl {
+  display: flex; align-items: center;
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+}
+.qty-btn {
+  width: 36px; height: 34px; background: none; border: none; color: var(--text);
+  font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: background 0.1s; font-family: var(--mono);
+}
+.qty-btn:hover { background: var(--border); }
+.qty-val { font-family: var(--mono); font-size: 15px; font-weight: 700; width: 48px; text-align: center; }
+.total-cost { font-family: var(--mono); font-size: 13px; color: var(--gold); margin-left: auto; }
+.btn-buy, .btn-sell-trade {
+  flex: 1; height: 44px; border: none; border-radius: 10px;
+  font-family: var(--sans); font-weight: 700; font-size: 15px; cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+}
+.btn-buy:active, .btn-sell-trade:active { transform: scale(0.97); }
+.btn-buy { background: var(--up); color: #000; }
+.btn-sell-trade { background: var(--down); color: #fff; }
+.btn-buy:disabled, .btn-sell-trade:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+
+/* 보유 정보 */
+.holding-info {
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+  padding: 8px 12px; margin-bottom: 10px; font-family: var(--mono); font-size: 11px;
+  display: flex; justify-content: space-between;
+}
+
+/* ── 매도창 손익 비교 패널 ── */
+.sell-compare-panel {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+.sell-compare-title {
+  font-family: var(--mono); font-size: 10px; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;
+}
+.sell-compare-grid {
+  display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;
+}
+.scg-item { text-align: center; }
+.scg-label { font-family: var(--mono); font-size: 9px; color: var(--muted); margin-bottom: 3px; }
+.scg-value { font-family: var(--mono); font-size: 13px; font-weight: 700; }
+.scg-arrow { font-size: 18px; display: flex; align-items: center; justify-content: center; }
+.sell-pnl-big {
+  margin-top: 8px;
+  padding: 8px;
+  border-radius: 8px;
+  text-align: center;
+  font-family: var(--mono); font-size: 15px; font-weight: 900;
+}
+.sell-pnl-big.profit { background: rgba(0,230,118,0.12); color: var(--up); }
+.sell-pnl-big.loss   { background: rgba(255,61,87,0.12);  color: var(--down); }
+.sell-pnl-big.flat   { background: rgba(136,136,170,0.1); color: var(--flat); }
+
+/* ── 포트폴리오 탭 ── */
+.portfolio-view { padding: 8px 0; }
+.holding-row {
+  padding: 12px 16px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px; cursor: pointer;
+}
+.holding-icon { width: 32px; height: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+.holding-info-col { flex: 1; min-width: 0; }
+.holding-name { font-weight: 700; font-size: 13px; }
+.holding-qty { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+.holding-pnl { text-align: right; }
+.holding-val { font-family: var(--mono); font-size: 14px; font-weight: 700; }
+.holding-pnl-val { font-family: var(--mono); font-size: 11px; }
+.empty-portfolio { padding: 40px 16px; text-align: center; color: var(--muted); font-family: var(--mono); font-size: 12px; line-height: 2; }
+
+/* ── 뉴스 팝업 ── */
+.news-popup {
+  position: fixed; top: 16px; left: 50%;
+  transform: translateX(-50%) translateY(-20px);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 12px 16px; z-index: 200; max-width: 320px; width: calc(100% - 32px);
+  opacity: 0; pointer-events: none;
+  transition: all 0.3s cubic-bezier(0.34, 1.4, 0.64, 1);
+  box-shadow: 0 8px 40px rgba(0,0,0,0.7);
+}
+.news-popup.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+.news-popup-tag { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+.news-popup-title { font-size: 13px; font-weight: 700; margin-bottom: 3px; }
+.news-popup-body  { font-size: 11px; color: var(--muted); line-height: 1.5; }
+
+/* ── 토스트 ── */
+.toast {
+  position: fixed; bottom: 80px; left: 50%;
+  transform: translateX(-50%) translateY(10px);
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 20px; padding: 8px 18px;
+  font-family: var(--mono); font-size: 12px;
+  opacity: 0; pointer-events: none; transition: all 0.2s; z-index: 300; white-space: nowrap;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ── 숏컷 퀵바 ── */
+.qty-shortcuts { display: flex; gap: 6px; margin-top: 4px; }
+.qty-short {
+  flex: 1; padding: 5px 0;
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
+  font-family: var(--mono); font-size: 11px; color: var(--muted);
+  cursor: pointer; text-align: center; transition: color 0.1s, border-color 0.1s;
+}
+.qty-short:hover { color: var(--text); border-color: var(--flat); }
+
+/* ── 게임오버 / 파산 모달 ── */
+.gameover-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.92);
+  z-index: 1000; display: none; align-items: center; justify-content: center;
+  flex-direction: column;
+}
+.gameover-overlay.show { display: flex; animation: fadeIn 0.5s; }
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
+
+.gameover-box {
+  background: #1a0a0f; border: 2px solid var(--down);
+  border-radius: 20px; padding: 32px 28px; max-width: 300px; width: 90%;
+  text-align: center; animation: shakeIn 0.6s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+@keyframes shakeIn {
+  0%   { transform: scale(0.5) rotate(-5deg); }
+  60%  { transform: scale(1.05) rotate(2deg); }
+  80%  { transform: scale(0.97) rotate(-1deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+.gameover-emoji { font-size: 60px; display: block; margin-bottom: 12px; animation: bounce 1s ease infinite; }
+@keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+.gameover-title { font-family: var(--mono); font-size: 22px; font-weight: 900; color: var(--down); margin-bottom: 8px; }
+.gameover-taunt { font-size: 14px; color: var(--muted); line-height: 1.6; margin-bottom: 20px; }
+.gameover-stat  { font-family: var(--mono); font-size: 12px; color: var(--flat); margin-bottom: 20px; }
+.gameover-restart {
+  background: var(--down); color: #fff; border: none; border-radius: 10px;
+  padding: 12px 28px; font-family: var(--sans); font-weight: 700; font-size: 14px;
+  cursor: pointer; transition: opacity 0.2s;
+}
+.gameover-restart:hover { opacity: 0.85; }
+
+/* ── 가이드 모달 ── */
+.guide-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.88);
+  z-index: 900; display: none; align-items: flex-start; justify-content: center;
+  overflow-y: auto; padding: 20px 16px;
+}
+.guide-overlay.show { display: flex; }
+.guide-box {
+  background: #131320; border: 1px solid #333366;
+  border-radius: 16px; padding: 24px 20px; max-width: 480px; width: 100%;
+  margin: auto;
+}
+.guide-close {
+  float: right; background: none; border: 1px solid var(--border);
+  border-radius: 8px; color: var(--muted); font-size: 16px;
+  cursor: pointer; padding: 3px 10px; transition: color 0.2s;
+}
+.guide-close:hover { color: var(--text); }
+.guide-title { font-family: var(--mono); font-size: 18px; font-weight: 700; color: #aaaaff; margin-bottom: 4px; }
+.guide-subtitle { font-size: 12px; color: var(--muted); margin-bottom: 20px; }
+.guide-section { margin-bottom: 18px; }
+.guide-section h3 { font-family: var(--mono); font-size: 12px; color: var(--gold); margin-bottom: 8px; letter-spacing: 0.05em; text-transform: uppercase; }
+.guide-section p, .guide-section li { font-size: 12px; color: #b0b0cc; line-height: 1.7; }
+.guide-section ul { padding-left: 16px; }
+.guide-section li { margin-bottom: 4px; }
+.guide-section .g-up   { color: var(--up); font-weight: 700; }
+.guide-section .g-down { color: var(--down); font-weight: 700; }
+.guide-section .g-gold { color: var(--gold); font-weight: 700; }
+.guide-divider { height: 1px; background: var(--border); margin: 16px 0; }
+.stock-guide-row {
+  display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+  border-radius: 8px; background: var(--surface2); margin-bottom: 6px;
+}
+.stock-guide-icon { font-size: 20px; }
+.stock-guide-info { flex: 1; }
+.stock-guide-name { font-weight: 700; font-size: 12px; }
+.stock-guide-type { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+.stock-guide-risk {
+  font-family: var(--mono); font-size: 10px; padding: 2px 7px; border-radius: 4px;
+}
+.risk-low    { background: rgba(0,230,118,0.15); color: var(--up); }
+.risk-mid    { background: rgba(245,200,66,0.15); color: var(--gold); }
+.risk-high   { background: rgba(255,61,87,0.15);  color: var(--down); }
+.risk-insane { background: rgba(255,0,128,0.2); color: #ff4499; }
+
+/* 큰 등락 플래시 (화면 전체) */
+.screen-flash {
+  position: fixed; inset: 0; pointer-events: none; z-index: 800;
+  opacity: 0; transition: opacity 0.3s;
+}
+.screen-flash.up   { background: rgba(0,230,118,0.08); }
+.screen-flash.down { background: rgba(255,61,87,0.08); }
+.screen-flash.show { opacity: 1; }
+
+/* 매수/매도 시 큰 알림 */
+.trade-flash {
+  position: fixed; top: 50%; left: 50%;
+  transform: translate(-50%,-50%) scale(0.5);
+  font-size: 40px; z-index: 850; pointer-events: none;
+  opacity: 0; transition: all 0.15s;
+}
+.trade-flash.show { opacity: 1; transform: translate(-50%,-50%) scale(1.2); }
+
+/* 보유 수량 뱃지 */
+.owned-badge {
+  position: absolute; right: 16px; top: 8px;
+  font-family: var(--mono); font-size: 9px;
+  background: rgba(245,200,66,0.15); color: var(--gold);
+  border: 1px solid rgba(245,200,66,0.3); border-radius: 4px;
+  padding: 1px 5px; pointer-events: none;
+}
+
+/* 타이머 텍스트 */
+.tick-timer-label {
+  font-family: var(--mono); font-size: 9px; color: var(--muted);
+  padding: 2px 16px; display: flex; align-items: center; justify-content: flex-end; gap: 4px;
+  background: var(--bg); border-bottom: 1px solid var(--border);
+}
+
+/* 수익 파티클 */
+.particle {
+  position: fixed; pointer-events: none; z-index: 900;
+  font-size: 20px; font-weight: 900; font-family: var(--mono);
+  animation: floatUp 1.2s ease-out forwards;
+}
+@keyframes floatUp {
+  0%   { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-80px) scale(0.7); }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- 헤더 -->
+  <div class="header">
+    <div class="header-left">
+      <div class="header-title">📈 주식 시뮬레이터</div>
+    </div>
+    <div class="header-right">
+      <button class="guide-btn" onclick="openGuide()">📖 가이드</button>
+      <div class="header-cash">
+        <div class="cash-label">예수금</div>
+        <div class="cash-value" id="cashDisplay">₩1,000,000</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 포트폴리오 요약 -->
+  <div class="portfolio-bar">
+    <div class="pf-item">
+      <span class="pf-label">평가자산</span>
+      <span class="pf-value flat" id="pfTotal">₩1,000,000</span>
+    </div>
+    <div class="pf-item">
+      <span class="pf-label">총 손익</span>
+      <span class="pf-value flat" id="pfPnL">±0</span>
+    </div>
+    <div class="pf-item">
+      <span class="pf-label">수익률</span>
+      <span class="pf-value flat" id="pfRatio">0.00%</span>
+    </div>
+  </div>
+
+  <!-- 큰 손익 배너 -->
+  <div class="big-pnl-banner">
+    <div>
+      <div class="big-pnl-label">현재 내 자산 상태</div>
+      <div class="big-pnl-value flat" id="bigPnlValue">보합 →→ ₩0</div>
+    </div>
+    <div class="pnl-emoji" id="pnlEmoji">😐</div>
+  </div>
+
+  <!-- 탭 -->
+  <div class="tabs">
+    <div class="tab active" id="tabMarket"    onclick="switchTab('market')">📊 시장</div>
+    <div class="tab"        id="tabDetail"    onclick="switchTab('detail')" style="display:none">🔍 상세</div>
+    <div class="tab"        id="tabPortfolio" onclick="switchTab('portfolio')">💼 내 주식</div>
+  </div>
+
+  <!-- 뉴스 배너 -->
+  <div class="news-banner">
+    <span class="news-ticker" id="tickerText">📡 시장 개장 중... 주식 시뮬레이터에 오신 것을 환영합니다!</span>
+  </div>
+
+  <!-- 업데이트 타이머 -->
+  <div class="tick-bar"><div class="tick-progress" id="tickProgress"></div></div>
+  <div class="tick-timer-label">⏱ 다음 업데이트: <span id="tickCountdown">5</span>초</div>
+
+  <!-- 시장 탭 -->
+  <div id="viewMarket" class="stock-list"></div>
+
+  <!-- 상세 탭 -->
+  <div id="viewDetail" class="detail-view" style="display:none"></div>
+
+  <!-- 포트폴리오 탭 -->
+  <div id="viewPortfolio" class="portfolio-view" style="display:none"></div>
+</div>
+
+<!-- 뉴스 팝업 -->
+<div class="news-popup" id="newsPopup">
+  <div class="news-popup-tag" id="newsTag">📰 뉴스</div>
+  <div class="news-popup-title" id="newsTitle"></div>
+  <div class="news-popup-body"  id="newsBody"></div>
+</div>
+
+<!-- 토스트 -->
+<div class="toast" id="toast"></div>
+
+<!-- 스크린 플래시 -->
+<div class="screen-flash" id="screenFlash"></div>
+
+<!-- 트레이드 플래시 -->
+<div class="trade-flash" id="tradeFlash"></div>
+
+<!-- 파산 모달 -->
+<div class="gameover-overlay" id="gameoverOverlay">
+  <div class="gameover-box">
+    <span class="gameover-emoji" id="gameoverEmoji">💸</span>
+    <div class="gameover-title">파산했습니다</div>
+    <div class="gameover-taunt" id="gameoverTaunt">주식은 아무나 하는 게 아닙니다.</div>
+    <div class="gameover-stat" id="gameoverStat"></div>
+    <button class="gameover-restart" onclick="restartGame()">🔄 다시 시작</button>
+  </div>
+</div>
+
+<!-- 가이드 모달 -->
+<div class="guide-overlay" id="guideOverlay" onclick="closeGuideOutside(event)">
+  <div class="guide-box">
+    <button class="guide-close" onclick="closeGuide()">✕ 닫기</button>
+    <div class="guide-title">📖 주식 게임 가이드</div>
+    <div class="guide-subtitle">주식이 처음이라면 여기서 시작하세요!</div>
+
+    <div class="guide-section">
+      <h3>🎮 게임 규칙</h3>
+      <ul>
+        <li><span class="g-gold">₩1,000,000</span>으로 시작합니다.</li>
+        <li>주가는 <span class="g-gold">5초마다</span> 자동으로 업데이트됩니다.</li>
+        <li>주식을 사고 팔아서 최대한 많은 돈을 버세요!</li>
+        <li>자산이 <span class="g-down">₩0</span>에 근접하면 게임오버입니다.</li>
+      </ul>
+    </div>
+    <div class="guide-divider"></div>
+
+    <div class="guide-section">
+      <h3>📈 주식이란?</h3>
+      <p>주식은 회사의 "조각"입니다. 주식을 사면 그 회사의 일부 주인이 됩니다.<br><br>
+      회사가 잘 나가면 주가(주식 가격)가 올라 <span class="g-up">이익</span>을 얻고,<br>
+      회사가 망하면 주가가 내려 <span class="g-down">손실</span>을 봅니다.</p>
+    </div>
+    <div class="guide-divider"></div>
+
+    <div class="guide-section">
+      <h3>🛒 어떻게 사고팔아요?</h3>
+      <ul>
+        <li><span class="g-up">매수</span> = 주식 사기. 돈을 내고 주식을 받습니다.</li>
+        <li><span class="g-down">매도</span> = 주식 팔기. 주식을 돌려주고 돈을 받습니다.</li>
+        <li>쌀 때 사서 비쌀 때 파는 게 핵심!</li>
+        <li>종목을 클릭하면 상세 화면에서 사고팔 수 있어요.</li>
+      </ul>
+    </div>
+    <div class="guide-divider"></div>
+
+    <div class="guide-section">
+      <h3>💰 손익이 뭔가요?</h3>
+      <p>내가 산 가격(평균단가)보다 현재 가격이 높으면 <span class="g-up">이익(+)</span>,<br>
+      낮으면 <span class="g-down">손실(-)</span>입니다.<br><br>
+      상세 화면 → 매도 탭에서 <span class="g-gold">내 매입가 vs 현재가 비교</span>를 볼 수 있어요!</p>
+    </div>
+    <div class="guide-divider"></div>
+
+    <div class="guide-section">
+      <h3>🏢 종목 소개 & 위험도</h3>
+      <div class="stock-guide-row">
+        <div class="stock-guide-icon">🌱</div>
+        <div class="stock-guide-info">
+          <div class="stock-guide-name">정새싹 컴퍼니</div>
+          <div class="stock-guide-type">안정적 대형주 · 완만한 상승</div>
+        </div>
+        <div class="stock-guide-risk risk-low">낮음</div>
+      </div>
+      <div class="stock-guide-row">
+        <div class="stock-guide-icon">🪒</div>
+        <div class="stock-guide-info">
+          <div class="stock-guide-name">아하기싫다 그룹</div>
+          <div class="stock-guide-type">초안정주 · 꾸준한 우상향</div>
+        </div>
+        <div class="stock-guide-risk risk-low">낮음</div>
+      </div>
+      <div class="stock-guide-row">
+        <div class="stock-guide-icon">🎤</div>
+        <div class="stock-guide-info">
+          <div class="stock-guide-name">The Copycats</div>
+          <div class="stock-guide-type">패턴형 · 규칙적 후 급변</div>
+        </div>
+        <div class="stock-guide-risk risk-mid">중간</div>
+      </div>
+      <div class="stock-guide-row">
+        <div class="stock-guide-icon">💦</div>
+        <div class="stock-guide-info">
+          <div class="stock-guide-name">분@무</div>
+          <div class="stock-guide-type">롤러코스터 · 급등락 반복</div>
+        </div>
+        <div class="stock-guide-risk risk-high">높음</div>
+      </div>
+      <div class="stock-guide-row">
+        <div class="stock-guide-icon">🦅</div>
+        <div class="stock-guide-info">
+          <div class="stock-guide-name">칵퉤컴퍼니</div>
+          <div class="stock-guide-type">고가 변동주 · 큰 폭 움직임</div>
+        </div>
+        <div class="stock-guide-risk risk-high">높음</div>
+      </div>
+      <div class="stock-guide-row">
+        <div class="stock-guide-icon">💣</div>
+        <div class="stock-guide-info">
+          <div class="stock-guide-name">히히히그룹</div>
+          <div class="stock-guide-type">폭탄주 · 언제 터질지 모름</div>
+        </div>
+        <div class="stock-guide-risk risk-insane">극위험</div>
+      </div>
+    </div>
+    <div class="guide-divider"></div>
+
+    <div class="guide-section">
+      <h3>💡 초보자 팁</h3>
+      <ul>
+        <li>처음엔 <span class="g-up">정새싹</span> 또는 <span class="g-up">아하기싫다</span>로 시작하세요.</li>
+        <li>뉴스 팝업이 뜨면 주가가 크게 움직이니 주목!</li>
+        <li>한 종목에 몰빵하지 말고 여러 곳에 나눠 투자하세요.</li>
+        <li>💣 히히히그룹은 초보자에겐 추천 안 합니다… 하지만 재밌습니다.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- BGM (autoplay) -->
+<audio id="bgm" loop>
+  <source src="bgm.mp3" type="audio/mpeg">
+</audio>
+
+<script>
+// ═══════════════════════════════════════════
+//  COMPANIES
+// ═══════════════════════════════════════════
+const COMPANIES = [
+  {
+    id: 'jss', name: '정새싹 컴퍼니', code: 'JSS', icon: '🌱',
+    color: '#22cc66', bg: '#0a2a18', desc: '대기업 전자제품',
+    initPrice: 85000, behavior: 'bluechip', volatility: 0.012, drift: 0.0004,
+  },
+  {
+    id: 'bun', name: '분@무', code: 'BUN', icon: '💦',
+    color: '#44aaff', bg: '#0a1828', desc: '분무기 제조업체',
+    initPrice: 4200, behavior: 'rollercoaster', volatility: 0.065, drift: 0.0001,
+  },
+  {
+    id: 'tcc', name: 'The Copycats', code: 'TCC', icon: '🎤',
+    color: '#cc88ff', bg: '#1a0a28', desc: '힙합 레이블',
+    initPrice: 32000, behavior: 'pattern_break', volatility: 0.018, drift: 0.0002,
+    cycle: 0, cycleLen: 30,
+  },
+  {
+    id: 'ahg', name: '아하기싫다 그룹', code: 'AHG', icon: '🪒',
+    color: '#aaaacc', bg: '#151520', desc: '독일계 면도기 기업',
+    initPrice: 51000, behavior: 'stable', volatility: 0.006, drift: 0.0006,
+  },
+  {
+    id: 'ktk', name: '칵퉤컴퍼니', code: 'KTK', icon: '🦅',
+    color: '#ff9900', bg: '#251500', desc: '정새싹 라이벌. 고가 변동주',
+    initPrice: 320000, behavior: 'volatile_high', volatility: 0.032, drift: 0.0001,
+  },
+  {
+    id: 'hhh', name: '히히히그룹', code: 'HHH', icon: '💣',
+    color: '#ff3366', bg: '#250a12', desc: '순수 도박주 🎰',
+    initPrice: 1000, behavior: 'bomb', volatility: 0.12, drift: 0.0,
+  },
+];
+
+const NEWS_POOL = {
+  jss: [
+    { type:'good', title:'정새싹, 신형 갤럭시 출시 성공', body:'역대 최대 사전예약 달성', effect: 0.08 },
+    { type:'good', title:'정새싹 영업이익 사상 최대', body:'해외 수출 45% 급증', effect: 0.06 },
+    { type:'bad',  title:'정새싹 공장 화재 발생', body:'생산 차질 우려로 주가 하락', effect: -0.07 },
+    { type:'bad',  title:'정새싹 대규모 리콜 공지', body:'배터리 결함 230만 대', effect: -0.09 },
+    { type:'good', title:'정새싹, 미국 빅테크와 반도체 협약', body:'5조원 규모 공급 계약', effect: 0.10 },
+  ],
+  bun: [
+    { type:'good', title:'분@무, 농업용 드론 시장 진출', body:'분무기의 진화... 주가 급등', effect: 0.25 },
+    { type:'bad',  title:'분@무 CEO "회사 망하면 어때요"', body:'황당 인터뷰에 투자자 패닉', effect: -0.30 },
+    { type:'good', title:'분@무 신제품 틱톡 바이럴', body:'#분무 챌린지 3억뷰 돌파', effect: 0.20 },
+    { type:'bad',  title:'분@무 제품 안전검사 불합격', body:'리콜 대신 "그냥 쓰세요" 발언', effect: -0.22 },
+    { type:'good', title:'분@무, K-뷰티 OEM 계약 체결', body:'미용 분야 확장 기대감', effect: 0.18 },
+    { type:'bad',  title:'분@무 창고 침수... 재고 전멸', body:'장마에 직격탄', effect: -0.28 },
+  ],
+  tcc: [
+    { type:'good', title:'The Copycats 신보 빌보드 1위', body:'글로벌 스트리밍 신기록', effect: 0.35 },
+    { type:'bad',  title:'The Copycats, 표절 소송 당해', body:'원곡자 측 "100% 카피"', effect: -0.40 },
+    { type:'good', title:'TCC 소속 아티스트 그래미 수상', body:'국내 힙합 역사 새로 쓰다', effect: 0.28 },
+    { type:'bad',  title:'TCC 간판 프로듀서 탈퇴 선언', body:'"계약 노예" 폭로글 확산', effect: -0.32 },
+    { type:'good', title:'TCC × 나이키 콜라보 발표', body:'한정판 스니커즈 1분 매진', effect: 0.22 },
+  ],
+  ahg: [
+    { type:'good', title:'아하기싫다, 유럽 품질인증 획득', body:'독일 DIN 기준 최고점', effect: 0.04 },
+    { type:'bad',  title:'아하기싫다, 독일 본사 노조 파업', body:'3일간 생산 중단', effect: -0.04 },
+    { type:'good', title:'아하기싫다, 아시아 시장 점유율 1위', body:'5년 연속 성장세 지속', effect: 0.05 },
+    { type:'bad',  title:'아하기싫다, 원자재값 상승 타격', body:'영업이익률 1.2%p 하락 예상', effect: -0.03 },
+    { type:'good', title:'아하기싫다 "30년 무결함 기록 달성"', body:'소비자 만족도 업계 1위', effect: 0.04 },
+  ],
+  ktk: [
+    { type:'good', title:'칵퉤, 반도체 자체 설계 성공', body:'정새싹 특허 우회 기술 발표', effect: 0.15 },
+    { type:'bad',  title:'칵퉤 CFO 횡령 혐의 검찰 소환', body:'내부 감사 결과 유출', effect: -0.18 },
+    { type:'good', title:'칵퉤 × 테슬라 전장부품 납품 계약', body:'10조원 규모 5년 계약', effect: 0.20 },
+    { type:'bad',  title:'칵퉤 신제품 발표회 현장 폭발사고', body:'시연 중 기기 과열 폭발', effect: -0.25 },
+    { type:'good', title:'칵퉤 AI 칩 성능 세계 1위 인증', body:'주가 수직 상승', effect: 0.18 },
+    { type:'bad',  title:'칵퉤 중국 공장 전면 폐쇄', body:'미·중 무역분쟁 직격탄', effect: -0.14 },
+  ],
+  hhh: [
+    { type:'good', title:'히히히 "우리가 이겼다"... 뭘?', body:'공시 내용 없음. 주가 급등', effect: 0.80 },
+    { type:'bad',  title:'히히히 대표 잠적', body:'어제 사옥서 마지막 목격', effect: -0.70 },
+    { type:'good', title:'히히히, 코인 발행 예고', body:'"히히히코인" 백서 공개', effect: 0.60 },
+    { type:'bad',  title:'히히히코인 스캠 판정', body:'금감원 "사기로 봄"', effect: -0.65 },
+    { type:'good', title:'히히히 신사업: 운석 채굴', body:'"우주에서 한 방"', effect: 0.90 },
+    { type:'bad',  title:'히히히 운석 채굴선 발사 실패', body:'폭발 영상 SNS 확산', effect: -0.75 },
+    { type:'good', title:'히히히 정부 구제금융 검토', body:'"망하면 나라 흔들린다"', effect: 0.50 },
+  ],
+};
+
+const TAUNT_MESSAGES = [
+  { emoji:'😂', msg:'주식보다 돈 세는 게 더 빨랐을걸요.\n거스름돈도 틀리는 분이시군요.' },
+  { emoji:'🤡', msg:'축하합니다! 전 재산을 증발시켰어요.\n재능이 있으십니다.' },
+  { emoji:'🪦', msg:'여기에 잠들다:\n₩1,000,000\n사랑받았고, 무참히 날렸음.' },
+  { emoji:'😭', msg:'엄마한테 용돈 달라고 해야 할 것 같은데요.\n이 성과로는 어렵겠지만.' },
+  { emoji:'🎪', msg:'"나 주식 좀 해"라고 말할 수 있는\n용기만큼은 칭찬합니다.' },
+  { emoji:'💀', msg:'히히히그룹에 전 재산 넣은 거\n본인도 알고 있었죠?' },
+  { emoji:'🤦', msg:'₩1,000,000을 날리는 데\n이렇게 재능이 있는 분은 처음 봐요.' },
+  { emoji:'📉', msg:'차트가 울고 있어요.\n아마 당신도 울고 있겠죠.' },
+];
+
+// ═══════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════
+const INIT_CASH = 1_000_000;
+const HISTORY_LEN = 80;
+const TICK_INTERVAL = 5000; // 5초
+
+const state = {
+  cash: INIT_CASH,
+  tick: 0,
+  currentTab: 'market',
+  selectedId: null,
+  tradeQty: 1,
+  holdings: {},
+  prices: {},
+  history: {},
+  news: [],
+  activeBehaviorData: {},
+  isGameover: false,
+  lastPrices: {},
+};
+
+COMPANIES.forEach(c => {
+  state.prices[c.id] = c.initPrice;
+  state.lastPrices[c.id] = c.initPrice;
+  state.history[c.id] = Array(HISTORY_LEN).fill(c.initPrice);
+  state.activeBehaviorData[c.id] = { cycle: 0 };
+});
+
+// ═══════════════════════════════════════════
+//  AUDIO
+// ═══════════════════════════════════════════
+function initAudio() {
+  const bgm = document.getElementById('bgm');
+  if (!bgm) return;
+  bgm.volume = 0.3;
+  const tryPlay = () => {
+    bgm.play().catch(() => {});
+    document.removeEventListener('click', tryPlay);
+    document.removeEventListener('touchstart', tryPlay);
+  };
+  // 자동재생 시도
+  bgm.play().catch(() => {
+    // 실패 시 첫 클릭에 재생
+    document.addEventListener('click', tryPlay, { once: true });
+    document.addEventListener('touchstart', tryPlay, { once: true });
+  });
+}
+
+// ═══════════════════════════════════════════
+//  PRICE ENGINE
+// ═══════════════════════════════════════════
+function nextPrice(company) {
+  const { id, behavior, volatility, drift, initPrice } = company;
+  const cur = state.prices[id];
+  const bd  = state.activeBehaviorData[id];
+  let pct = 0;
+
+  switch(behavior) {
+    case 'bluechip': {
+      // 정새싹: 가우시안 + 약한 평균회귀 (불규칙 보장)
+      const noise1 = randn() * volatility;
+      const noise2 = (Math.random() - 0.5) * volatility * 0.5;
+      pct = noise1 + noise2 + drift - (cur - initPrice) * 0.00008;
+      break;
+    }
+    case 'stable': {
+      // 아하기싫다: 매우 안정적이지만 완전 규칙적이진 않음
+      pct = randn() * volatility + drift + (Math.random() - 0.5) * volatility * 0.3;
+      break;
+    }
+    case 'rollercoaster': {
+      const spike = Math.random() < 0.08 ? (Math.random() - 0.45) * 0.5 : 0;
+      pct = randn() * volatility + spike + drift;
+      break;
+    }
+    case 'pattern_break': {
+      // TCC: 완전히 랜덤한 사인파 주기 + 노이즈
+      bd.cycle++;
+      const noisyPhase = bd.cycle * (0.35 + Math.random() * 0.15);
+      if (bd.cycle < 30) {
+        pct = Math.sin(noisyPhase) * 0.012 + randn() * 0.006 + drift;
+      } else {
+        if (bd.cycle === 30) {
+          pct = (Math.random() < 0.5 ? -1 : 1) * (0.2 + Math.random() * 0.25);
+          bd.cycle = Math.floor(Math.random() * 5); // 랜덤하게 리셋
+        }
+      }
+      break;
+    }
+    case 'volatile_high': {
+      pct = randn() * volatility * 1.5 + drift + (Math.random() < 0.05 ? (Math.random()-0.5)*0.12 : 0);
+      break;
+    }
+    case 'bomb': {
+      const bigBoom = Math.random() < 0.05 ? (Math.random()-0.45)*1.2 : 0;
+      pct = randn() * volatility + bigBoom;
+      break;
+    }
+  }
+
+  const floor = initPrice * 0.05;
+  const newPrice = Math.max(floor, cur * (1 + pct));
+  return Math.round(newPrice);
+}
+
+function randn() {
+  let u = 0, v = 0;
+  while(u === 0) u = Math.random();
+  while(v === 0) v = Math.random();
+  return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v) * 0.5;
+}
+
+// ═══════════════════════════════════════════
+//  TICK TIMER
+// ═══════════════════════════════════════════
+let tickCountdown = 5;
+let tickProgressInterval = null;
+
+function startTickTimer() {
+  tickCountdown = 5;
+  clearInterval(tickProgressInterval);
+  tickProgressInterval = setInterval(() => {
+    tickCountdown -= 0.1;
+    if (tickCountdown < 0) tickCountdown = 0;
+    const pct = ((5 - tickCountdown) / 5) * 100;
+    const prog = document.getElementById('tickProgress');
+    if (prog) prog.style.width = pct + '%';
+    const cd = document.getElementById('tickCountdown');
+    if (cd) cd.textContent = Math.ceil(tickCountdown);
+  }, 100);
+}
+
+// ═══════════════════════════════════════════
+//  TICK
+// ═══════════════════════════════════════════
+function tick() {
+  if (state.isGameover) return;
+  state.tick++;
+
+  // 이전 가격 저장
+  COMPANIES.forEach(c => { state.lastPrices[c.id] = state.prices[c.id]; });
+
+  COMPANIES.forEach(c => {
+    const newP = nextPrice(c);
+    state.prices[c.id] = newP;
+    state.history[c.id].push(newP);
+    if(state.history[c.id].length > HISTORY_LEN) state.history[c.id].shift();
+  });
+
+  if (Math.random() < 0.12) fireNewsEvent();
+
+  updateUI();
+  checkGameover();
+  startTickTimer();
+}
+
+function fireNewsEvent() {
+  const c = COMPANIES[Math.floor(Math.random() * COMPANIES.length)];
+  const pool = NEWS_POOL[c.id];
+  const ev   = pool[Math.floor(Math.random() * pool.length)];
+  const cur = state.prices[c.id];
+  state.prices[c.id] = Math.max(c.initPrice * 0.05, Math.round(cur * (1 + ev.effect)));
+  state.history[c.id][state.history[c.id].length - 1] = state.prices[c.id];
+  showNewsPopup(c, ev);
+  pushTicker(c, ev);
+}
+
+function checkGameover() {
+  let totalVal = state.cash;
+  Object.entries(state.holdings).forEach(([id, h]) => {
+    totalVal += state.prices[id] * h.qty;
+  });
+  if (totalVal < 500 && !state.isGameover) {
+    state.isGameover = true;
+    showGameover(totalVal);
+  }
+}
+
+function showGameover(totalVal) {
+  const taunt = TAUNT_MESSAGES[Math.floor(Math.random() * TAUNT_MESSAGES.length)];
+  document.getElementById('gameoverEmoji').textContent = taunt.emoji;
+  document.getElementById('gameoverTaunt').textContent = taunt.msg;
+  document.getElementById('gameoverStat').textContent =
+    `최종 자산: ₩${fmt(Math.round(totalVal))} | ${state.tick}틱 만에 파산`;
+  document.getElementById('gameoverOverlay').classList.add('show');
+}
+
+function restartGame() {
+  state.cash = INIT_CASH;
+  state.tick = 0;
+  state.holdings = {};
+  state.isGameover = false;
+  state.currentTab = 'market';
+  state.selectedId = null;
+  COMPANIES.forEach(c => {
+    state.prices[c.id] = c.initPrice;
+    state.lastPrices[c.id] = c.initPrice;
+    state.history[c.id] = Array(HISTORY_LEN).fill(c.initPrice);
+    state.activeBehaviorData[c.id] = { cycle: 0 };
+  });
+  document.getElementById('gameoverOverlay').classList.remove('show');
+  document.getElementById('tabDetail').style.display = 'none';
+  switchTab('market');
+}
+
+// ═══════════════════════════════════════════
+//  TRADE
+// ═══════════════════════════════════════════
+function buyStock() {
+  const id  = state.selectedId;
+  const qty = state.tradeQty;
+  if(!id || qty <= 0) return;
+  const price = state.prices[id];
+  const cost  = price * qty;
+  if(cost > state.cash) { showToast('💸 잔고가 부족합니다'); return; }
+
+  state.cash -= cost;
+  if(!state.holdings[id]) state.holdings[id] = { qty: 0, avgCost: 0 };
+  const h = state.holdings[id];
+  h.avgCost = (h.avgCost * h.qty + price * qty) / (h.qty + qty);
+  h.qty += qty;
+
+  showTradeFlash('💰');
+  spawnParticles(`+₩${fmt(Math.round(cost))}`, '#00e676');
+  showToast(`✅ ${COMPANIES.find(c=>c.id===id).name} ${qty}주 매수 완료!`);
+  updateUI();
+}
+
+function sellStock() {
+  const id  = state.selectedId;
+  const qty = state.tradeQty;
+  if(!id || qty <= 0) return;
+  const h = state.holdings[id];
+  if(!h || h.qty < qty) { showToast('📦 보유 수량이 부족합니다'); return; }
+
+  const price  = state.prices[id];
+  const avgCost = h.avgCost;
+  state.cash += price * qty;
+  h.qty -= qty;
+  if(h.qty === 0) delete state.holdings[id];
+
+  const pnl = (price - avgCost) * qty;
+  const pnlStr = pnl >= 0 ? `+₩${fmt(Math.abs(pnl))}` : `-₩${fmt(Math.abs(pnl))}`;
+  if (pnl >= 0) {
+    showTradeFlash('🤑');
+    spawnParticles(pnlStr, '#00e676');
+  } else {
+    showTradeFlash('😱');
+    spawnParticles(pnlStr, '#ff3d57');
+  }
+  showToast(`${pnl>=0?'🟢 수익':'🔴 손실'} 매도 완료 (${pnlStr})`);
+  updateUI();
+}
+
+// ═══════════════════════════════════════════
+//  UI UPDATE
+// ═══════════════════════════════════════════
+function updateUI() {
+  updateHeader();
+  if(state.currentTab === 'market')    renderMarket();
+  if(state.currentTab === 'detail')    renderDetail();
+  if(state.currentTab === 'portfolio') renderPortfolio();
+}
+
+function updateHeader() {
+  document.getElementById('cashDisplay').textContent = '₩' + fmt(state.cash);
+
+  let totalVal = state.cash;
+  Object.entries(state.holdings).forEach(([id, h]) => {
+    totalVal += state.prices[id] * h.qty;
+  });
+
+  const pnl = totalVal - INIT_CASH;
+  const ratio = ((totalVal / INIT_CASH) - 1) * 100;
+
+  const pfTotal = document.getElementById('pfTotal');
+  const pfPnL   = document.getElementById('pfPnL');
+  const pfRatio = document.getElementById('pfRatio');
+
+  pfTotal.textContent = '₩' + fmt(Math.round(totalVal));
+  pfTotal.className   = 'pf-value flat';
+
+  const cls = pnl > 0 ? 'up' : pnl < 0 ? 'down' : 'flat';
+  pfPnL.textContent   = (pnl >= 0 ? '+₩' : '-₩') + fmt(Math.round(Math.abs(pnl)));
+  pfPnL.className     = 'pf-value ' + cls;
+  pfRatio.textContent = (ratio >= 0 ? '+' : '') + ratio.toFixed(2) + '%';
+  pfRatio.className   = 'pf-value ' + cls;
+
+  // 큰 손익 배너 업데이트
+  const bigVal = document.getElementById('bigPnlValue');
+  const emoji  = document.getElementById('pnlEmoji');
+  if (pnl > 0) {
+    bigVal.className = 'big-pnl-value up';
+    bigVal.textContent = `▲ 수익 중  +₩${fmt(Math.round(pnl))}`;
+    emoji.textContent = ratio > 20 ? '🤑' : ratio > 10 ? '😄' : '😊';
+  } else if (pnl < 0) {
+    bigVal.className = 'big-pnl-value down';
+    bigVal.textContent = `▼ 손실 중  -₩${fmt(Math.round(Math.abs(pnl)))}`;
+    emoji.textContent = ratio < -30 ? '😭' : ratio < -15 ? '😰' : '😟';
+  } else {
+    bigVal.className = 'big-pnl-value flat';
+    bigVal.textContent = '→ 보합  ±₩0';
+    emoji.textContent = '😐';
+  }
+}
+
+// ─── 시장 탭 ───
+function renderMarket() {
+  const el = document.getElementById('viewMarket');
+  el.innerHTML = '';
+  COMPANIES.forEach(c => {
+    const hist = state.history[c.id];
+    const prev = hist[hist.length - 2] || hist[0];
+    const cur  = state.prices[c.id];
+    const last = state.lastPrices[c.id] || prev;
+    const chg  = cur - prev;
+    const chgPct = ((chg / prev) * 100).toFixed(2);
+    const up   = chg >= 0;
+    const h    = state.holdings[c.id];
+
+    const row = document.createElement('div');
+    row.className = 'stock-row';
+    if (cur > last) row.classList.add('flash-up');
+    else if (cur < last) row.classList.add('flash-down');
+
+    row.innerHTML = `
+      ${h ? `<div class="owned-badge">보유 ${h.qty}주</div>` : ''}
+      <div class="stock-icon" style="background:${c.bg};color:${c.color}">${c.icon}</div>
+      <div class="stock-info">
+        <div class="stock-name">${c.name}</div>
+        <div class="stock-code">${c.code} · ${c.desc}</div>
+      </div>
+      <svg class="mini-chart" id="mini_${c.id}" viewBox="0 0 64 32" preserveAspectRatio="none"></svg>
+      <div class="stock-price-col">
+        <div class="stock-price" style="color:${up?'var(--up)':'var(--down)'}">${fmtP(cur)}</div>
+        <div>
+          <span class="change-badge ${up?'up':'down'}">
+            ${up?'▲':'▼'} ${Math.abs(chgPct)}%
+          </span>
+        </div>
+      </div>
+    `;
+    row.onclick = () => openDetail(c.id);
+    el.appendChild(row);
+    drawMiniChart(c.id);
+  });
+}
+
+function drawMiniChart(id) {
+  const svg  = document.getElementById('mini_' + id);
+  if(!svg) return;
+  const hist = state.history[id].slice(-30);
+  const min  = Math.min(...hist);
+  const max  = Math.max(...hist);
+  const range = max - min || 1;
+  const W = 64, H = 32;
+  const pts = hist.map((p, i) => {
+    const x = (i / (hist.length-1)) * W;
+    const y = H - ((p - min) / range) * (H - 4) - 2;
+    return `${x},${y}`;
+  }).join(' ');
+  const up = hist[hist.length-1] >= hist[0];
+  const col = up ? 'var(--up)' : 'var(--down)';
+  svg.innerHTML = `<polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+}
+
+// ─── 상세 탭 ───
+function openDetail(id) {
+  state.selectedId = id;
+  state.tradeQty   = 1;
+  document.getElementById('tabDetail').style.display = '';
+  switchTab('detail');
+}
+
+function renderDetail() {
+  const id = state.selectedId;
+  if(!id) return;
+  const c    = COMPANIES.find(x => x.id === id);
+  const hist = state.history[id];
+  const cur  = state.prices[id];
+  const prev = hist[hist.length-2] || hist[0];
+  const chg  = cur - prev;
+  const chgPct = ((chg/prev)*100).toFixed(2);
+  const up   = chg >= 0;
+  const h    = state.holdings[id];
+
+  // 등락 방향 텍스트
+  let dirText, dirCls;
+  if (chg > 0)      { dirText = `▲ 올랐어요  +${chgPct}%`; dirCls = 'up'; }
+  else if (chg < 0) { dirText = `▼ 떨어졌어요  ${chgPct}%`; dirCls = 'down'; }
+  else               { dirText = `→ 변동 없음  0%`; dirCls = 'flat'; }
+
+  // 매도 시 손익 비교 패널
+  let sellCompareHTML = '';
+  if (h) {
+    const qty      = state.tradeQty;
+    const sellQty  = Math.min(qty, h.qty);
+    const buyPrice = Math.round(h.avgCost);
+    const sellPrice = cur;
+    const pnlPerShare = sellPrice - buyPrice;
+    const totalPnl    = pnlPerShare * sellQty;
+    const pnlPct      = ((pnlPerShare / buyPrice) * 100).toFixed(2);
+    const isProfit    = totalPnl >= 0;
+
+    let pnlLabel, pnlClass;
+    if (isProfit) { pnlLabel = `🤑 이득! +₩${fmt(Math.round(Math.abs(totalPnl)))} (+${Math.abs(pnlPct)}%)`; pnlClass = 'profit'; }
+    else           { pnlLabel = `😢 손해... -₩${fmt(Math.round(Math.abs(totalPnl)))} (-${Math.abs(pnlPct)}%)`; pnlClass = 'loss'; }
+
+    sellCompareHTML = `
+      <div class="sell-compare-panel">
+        <div class="sell-compare-title">📊 ${sellQty}주 팔면 얼마 손익?</div>
+        <div class="sell-compare-grid">
+          <div class="scg-item">
+            <div class="scg-label">내가 산 가격</div>
+            <div class="scg-value" style="color:var(--flat)">${fmtP(buyPrice)}</div>
+          </div>
+          <div class="scg-arrow" style="color:${isProfit?'var(--up)':'var(--down)'}">
+            ${isProfit?'→📈':'→📉'}
+          </div>
+          <div class="scg-item">
+            <div class="scg-label">지금 가격</div>
+            <div class="scg-value" style="color:${isProfit?'var(--up)':'var(--down)'}">${fmtP(cur)}</div>
+          </div>
+        </div>
+        <div class="sell-pnl-big ${pnlClass}">${pnlLabel}</div>
+      </div>
+    `;
+  }
+
+  const holdingHTML = h ? `
+    <div class="holding-info">
+      <span>보유 <b>${h.qty}주</b> · 평균단가 ${fmtP(Math.round(h.avgCost))}</span>
+      <span style="color:${cur>=h.avgCost?'var(--up)':'var(--down)'}">
+        평가손익 ${cur>=h.avgCost?'+':'-'}₩${fmt(Math.round(Math.abs((cur-h.avgCost)*h.qty)))}
+      </span>
+    </div>` : '';
+
+  const cost = getCostForQty(id, state.tradeQty);
+
+  const el = document.getElementById('viewDetail');
+  el.innerHTML = `
+    <div class="detail-header">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:40px;height:40px;border-radius:10px;background:${c.bg};color:${c.color};display:flex;align-items:center;justify-content:center;font-size:22px">${c.icon}</div>
+        <div>
+          <div class="detail-name">${c.name}</div>
+          <div class="detail-code">${c.code} · ${c.desc}</div>
+        </div>
+      </div>
+      <div class="detail-price" style="color:${up?'var(--up)':'var(--down)'}">${fmtP(cur)}</div>
+    </div>
+
+    <!-- 큰 등락 표시 -->
+    <div class="direction-bar">
+      <div class="direction-indicator ${dirCls}">${dirText}</div>
+    </div>
+
+    <div class="chart-wrap">
+      <div class="chart-title">가격 히스토리 (최근 ${HISTORY_LEN}틱)</div>
+      <canvas id="mainChart" height="150"></canvas>
+    </div>
+
+    <div class="trade-panel">
+      ${holdingHTML}
+      ${sellCompareHTML}
+      <div class="trade-row">
+        <span class="trade-label">수량</span>
+        <div class="qty-ctrl">
+          <button class="qty-btn" onclick="changeQty(-1)">−</button>
+          <span class="qty-val" id="qtyVal">${state.tradeQty}</span>
+          <button class="qty-btn" onclick="changeQty(1)">＋</button>
+        </div>
+        <span class="total-cost" id="totalCost">₩${fmt(cost)}</span>
+      </div>
+      <div class="qty-shortcuts">
+        <div class="qty-short" onclick="setQty(1)">1주</div>
+        <div class="qty-short" onclick="setQty(5)">5주</div>
+        <div class="qty-short" onclick="setQty(10)">10주</div>
+        <div class="qty-short" onclick="setQtyMax()">최대</div>
+      </div>
+      <div class="trade-row" style="margin-top:12px;gap:8px">
+        <button class="btn-buy"        onclick="buyStock()">💰 매수 (사기)</button>
+        <button class="btn-sell-trade" onclick="sellStock()" ${!h?'disabled':''}>📤 매도 (팔기)</button>
+      </div>
+      <div style="text-align:center;margin-top:6px;font-size:10px;color:var(--muted);font-family:var(--mono)">
+        매수 = 주식 사기 · 매도 = 주식 팔기
+      </div>
+    </div>
+  `;
+
+  drawMainChart(id);
+}
+
+function drawMainChart(id) {
+  const canvas = document.getElementById('mainChart');
+  if(!canvas) return;
+  const hist = state.history[id];
+  const dpr  = window.devicePixelRatio || 1;
+  const W    = canvas.parentElement.clientWidth - 32;
+  const H    = 150;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const min   = Math.min(...hist);
+  const max   = Math.max(...hist);
+  const range = max - min || 1;
+  const pad   = { t:8, b:20, l:8, r:8 };
+  const cW    = W - pad.l - pad.r;
+  const cH    = H - pad.t - pad.b;
+
+  const px = i => pad.l + (i / (hist.length-1)) * cW;
+  const py = v => pad.t + cH - ((v - min) / range) * cH;
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth   = 1;
+  for(let i=0;i<4;i++) {
+    const y = pad.t + (cH/3)*i;
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l+cW, y); ctx.stroke();
+  }
+
+  const up = hist[hist.length-1] >= hist[0];
+  const lineColor = up ? '#00e676' : '#ff3d57';
+
+  const grad = ctx.createLinearGradient(0, pad.t, 0, pad.t + cH);
+  grad.addColorStop(0, up ? 'rgba(0,230,118,0.25)' : 'rgba(255,61,87,0.25)');
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+
+  ctx.beginPath();
+  ctx.moveTo(px(0), py(hist[0]));
+  for(let i=1;i<hist.length;i++) ctx.lineTo(px(i), py(hist[i]));
+  ctx.lineTo(px(hist.length-1), py(min) + cH + pad.b);
+  ctx.lineTo(px(0), py(min) + cH + pad.b);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(px(0), py(hist[0]));
+  for(let i=1;i<hist.length;i++) ctx.lineTo(px(i), py(hist[i]));
+  ctx.strokeStyle = lineColor;
+  ctx.lineWidth   = 1.8;
+  ctx.lineJoin    = 'round';
+  ctx.stroke();
+
+  const lx = px(hist.length-1);
+  const ly = py(hist[hist.length-1]);
+  ctx.beginPath();
+  ctx.arc(lx, ly, 3.5, 0, Math.PI*2);
+  ctx.fillStyle = lineColor;
+  ctx.fill();
+
+  ctx.fillStyle = 'rgba(120,120,160,0.8)';
+  ctx.font      = `9px IBM Plex Mono, monospace`;
+  ctx.textAlign = 'right';
+  [min, (min+max)/2, max].forEach(v => {
+    ctx.fillText(fmtP(Math.round(v)), pad.l + cW - 2, py(v) - 2);
+  });
+}
+
+// ─── 포트폴리오 탭 ───
+function renderPortfolio() {
+  const el = document.getElementById('viewPortfolio');
+  const ids = Object.keys(state.holdings);
+
+  if(ids.length === 0) {
+    el.innerHTML = `<div class="empty-portfolio">💼 보유 종목 없음<br><span style="font-size:11px">시장 탭에서 종목을 매수(사기)하세요</span></div>`;
+    return;
+  }
+
+  el.innerHTML = '';
+  ids.forEach(id => {
+    const c   = COMPANIES.find(x => x.id === id);
+    const h   = state.holdings[id];
+    const cur = state.prices[id];
+    const val = cur * h.qty;
+    const pnl = (cur - h.avgCost) * h.qty;
+    const up  = pnl >= 0;
+    const pnlPct = (((cur - h.avgCost) / h.avgCost) * 100).toFixed(1);
+
+    const row = document.createElement('div');
+    row.className = 'holding-row';
+    row.innerHTML = `
+      <div class="holding-icon" style="background:${c.bg};color:${c.color}">${c.icon}</div>
+      <div class="holding-info-col">
+        <div class="holding-name">${c.name}</div>
+        <div class="holding-qty">${h.qty}주 · 평균 ${fmtP(Math.round(h.avgCost))} → 현재 ${fmtP(cur)}</div>
+      </div>
+      <div class="holding-pnl">
+        <div class="holding-val">₩${fmt(Math.round(val))}</div>
+        <div style="margin-top:2px">
+          <span class="change-badge ${up?'up':'down'}" style="font-size:10px">
+            ${up?'▲':'▼'} ${Math.abs(pnlPct)}% (${up?'+':'-'}₩${fmt(Math.round(Math.abs(pnl)))})
+          </span>
+        </div>
+      </div>
+    `;
+    row.onclick = () => openDetail(id);
+    el.appendChild(row);
+  });
+}
+
+// ═══════════════════════════════════════════
+//  TABS
+// ═══════════════════════════════════════════
+function switchTab(tab) {
+  state.currentTab = tab;
+  ['market','detail','portfolio'].forEach(t => {
+    document.getElementById('view' + cap(t)).style.display = tab===t ? '' : 'none';
+    const tabEl = document.getElementById('tab' + cap(t));
+    if(tabEl) tabEl.classList.toggle('active', tab===t);
+  });
+  updateUI();
+}
+function cap(s) { return s[0].toUpperCase() + s.slice(1); }
+
+// ═══════════════════════════════════════════
+//  QTY
+// ═══════════════════════════════════════════
+function changeQty(delta) {
+  state.tradeQty = Math.max(1, state.tradeQty + delta);
+  document.getElementById('qtyVal').textContent = state.tradeQty;
+  const cost = getCostForQty(state.selectedId, state.tradeQty);
+  document.getElementById('totalCost').textContent = '₩' + fmt(cost);
+  // 손익 비교 패널 갱신
+  renderDetail();
+}
+function setQty(n) { state.tradeQty = n; renderDetail(); }
+function setQtyMax() {
+  const id = state.selectedId;
+  const p  = state.prices[id];
+  state.tradeQty = Math.max(1, Math.floor(state.cash / p));
+  renderDetail();
+}
+function getCostForQty(id, qty) { return id ? state.prices[id] * qty : 0; }
+
+// ═══════════════════════════════════════════
+//  NEWS
+// ═══════════════════════════════════════════
+let newsTimer = null;
+function showNewsPopup(company, ev) {
+  const popup = document.getElementById('newsPopup');
+  document.getElementById('newsTag').textContent   = ev.type === 'good' ? '📈 호재 뉴스!' : '📉 악재 뉴스!';
+  document.getElementById('newsTag').style.color   = ev.type === 'good' ? 'var(--up)' : 'var(--down)';
+  document.getElementById('newsTitle').textContent = ev.title;
+  document.getElementById('newsBody').textContent  = `${company.name} — ${ev.body}`;
+  popup.style.borderColor = ev.type==='good' ? 'var(--up)' : 'var(--down)';
+  popup.classList.add('show');
+  clearTimeout(newsTimer);
+  newsTimer = setTimeout(() => popup.classList.remove('show'), 4000);
+
+  // 화면 플래시
+  const flash = document.getElementById('screenFlash');
+  flash.className = `screen-flash ${ev.type==='good'?'up':'down'} show`;
+  setTimeout(() => flash.classList.remove('show'), 800);
+}
+function pushTicker(company, ev) {
+  const tag  = ev.type==='good' ? `<span class="news-tag-good">▲ 호재</span>` : `<span class="news-tag-bad">▼ 악재</span>`;
+  document.getElementById('tickerText').innerHTML += ` ··· [${company.code}] ${tag} ${ev.title}   `;
+}
+
+// ═══════════════════════════════════════════
+//  TOAST
+// ═══════════════════════════════════════════
+let toastTimer = null;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ═══════════════════════════════════════════
+//  PARTICLES & FLASH
+// ═══════════════════════════════════════════
+function spawnParticles(text, color) {
+  for(let i = 0; i < 3; i++) {
+    setTimeout(() => {
+      const p = document.createElement('div');
+      p.className = 'particle';
+      p.textContent = text;
+      p.style.color = color;
+      p.style.left  = (30 + Math.random() * 40) + 'vw';
+      p.style.top   = (40 + Math.random() * 20) + 'vh';
+      document.body.appendChild(p);
+      setTimeout(() => p.remove(), 1200);
+    }, i * 100);
+  }
+}
+
+let tradeFlashTimer = null;
+function showTradeFlash(emoji) {
+  const el = document.getElementById('tradeFlash');
+  el.textContent = emoji;
+  el.classList.add('show');
+  clearTimeout(tradeFlashTimer);
+  tradeFlashTimer = setTimeout(() => el.classList.remove('show'), 600);
+}
+
+// ═══════════════════════════════════════════
+//  GUIDE
+// ═══════════════════════════════════════════
+function openGuide()  { document.getElementById('guideOverlay').classList.add('show'); }
+function closeGuide() { document.getElementById('guideOverlay').classList.remove('show'); }
+function closeGuideOutside(e) {
+  if (e.target === document.getElementById('guideOverlay')) closeGuide();
+}
+
+// ═══════════════════════════════════════════
+//  UTIL
+// ═══════════════════════════════════════════
+function fmt(n)  { return Math.round(n).toLocaleString('ko-KR'); }
+function fmtP(n) { return n >= 1000 ? '₩' + fmt(n) : '₩' + n.toLocaleString('ko-KR'); }
+
+// ═══════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════
+function warmup() {
+  for(let i=0; i<HISTORY_LEN - 1; i++) {
+    COMPANIES.forEach(c => {
+      const newP = nextPrice(c);
+      state.prices[c.id] = newP;
+      state.history[c.id].push(newP);
+      if(state.history[c.id].length > HISTORY_LEN) state.history[c.id].shift();
+    });
+  }
+  COMPANIES.forEach(c => { state.lastPrices[c.id] = state.prices[c.id]; });
+}
+
+warmup();
+renderMarket();
+updateHeader();
+initAudio();
+startTickTimer();
+
+setInterval(tick, TICK_INTERVAL);
+
+window.addEventListener('resize', () => {
+  if(state.currentTab === 'detail' && state.selectedId) drawMainChart(state.selectedId);
+});
+</script>
+</body>
+</html>
