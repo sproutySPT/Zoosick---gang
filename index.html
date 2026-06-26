@@ -5657,6 +5657,7 @@ function playBlackMarket() {
     playSfx('cardShuffle');
     return;
   }
+  //아 힘들다 ㅠ.ㅠ
 
   if (bmState.phase === 'selecting') {
     if (bmState.pickedIndex < 0) { showToast('👆 카드를 먼저 선택해주세요'); playSfx('error'); return; }
@@ -5837,6 +5838,7 @@ window.addEventListener('beforeunload', saveGame);
 window.addEventListener('resize', () => {
   if(state.currentTab === 'detail' && state.selectedId) drawMainChart(state.selectedId);
 });
+  //축하합니다! 개발자가 꽁꽁숨겨둔 메시지를 찾으셨습니다! 이거 사진찍어서 개발자한테 보여주고 개발자인증키를 얻으세요!!!
 </script>
 </body>
 </html>
