@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://sproutyspt.github.io/Zoosick---gang/sitemap.xml
